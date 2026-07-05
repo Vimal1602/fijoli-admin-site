@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Eye, ExternalLink, MessageCircle, Heart, User } from "lucide-react";
+import { CheckCircle, XCircle, Eye, ExternalLink, MessageCircle, Heart, User, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -35,6 +35,7 @@ interface ReportedPost {
   post: {
     content: string;
     image_url: string | null;
+    video_url: string | null;
     user_id: string;
     likes_count: number;
     comments_count: number;
@@ -45,6 +46,13 @@ interface ReportedPost {
     email: string | null;
     phone_e164: string;
   } | null;
+}
+
+interface PostAuthor {
+  id: string;
+  name: string | null;
+  email: string | null;
+  phone_e164: string | null;
 }
 
 interface Comment {
@@ -64,6 +72,7 @@ export default function Reports() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<ReportedPost | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [postAuthor, setPostAuthor] = useState<PostAuthor | null>(null);
 
   useEffect(() => {
     fetchReports();
@@ -84,6 +93,7 @@ export default function Reports() {
           posts:post_id (
             content,
             image_url,
+            video_url,
             user_id,
             likes_count,
             comments_count
@@ -187,6 +197,7 @@ export default function Reports() {
   const openPostDetails = async (report: ReportedPost) => {
     setSelectedPost(report);
     setDetailsDialogOpen(true);
+    setPostAuthor(null);
 
     // Fetch comments for this post
     if (report.post_id) {
@@ -208,6 +219,26 @@ export default function Reports() {
       } catch (error) {
         console.error("Error fetching comments:", error);
         setComments([]);
+      }
+    } else {
+      setComments([]);
+    }
+
+    // posts.user_id has no FK relationship registered in the schema cache,
+    // so the author can't be embedded in the post_reports query above — fetch separately.
+    if (report.post?.user_id) {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("id, name, email, phone_e164")
+          .eq("id", report.post.user_id)
+          .maybeSingle();
+
+        if (error) throw error;
+        setPostAuthor(data);
+      } catch (error) {
+        console.error("Error fetching post author:", error);
+        setPostAuthor(null);
       }
     }
   };
@@ -302,9 +333,19 @@ export default function Reports() {
                               if (report.post?.image_url) window.open(report.post.image_url, '_blank');
                             }}
                           />
+                        ) : report.post.video_url ? (
+                          <div
+                            className="w-20 h-20 bg-muted rounded-md flex items-center justify-center shrink-0 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (report.post?.video_url) window.open(report.post.video_url, '_blank');
+                            }}
+                          >
+                            <Video className="h-6 w-6 text-muted-foreground" />
+                          </div>
                         ) : (
                           <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center shrink-0">
-                            <span className="text-xs text-muted-foreground">No image</span>
+                            <span className="text-xs text-muted-foreground">No media</span>
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
@@ -344,7 +385,10 @@ export default function Reports() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => updateReportStatus(report.id, "dismissed")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateReportStatus(report.id, "dismissed");
+                        }}
                         className="flex-1 touch-target"
                       >
                         <XCircle className="h-4 w-4 mr-2" />
@@ -354,7 +398,10 @@ export default function Reports() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => openDeleteDialog(report.post_id, report.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeleteDialog(report.post_id, report.id);
+                          }}
                           className="flex-1 touch-target"
                         >
                           Delete Post
@@ -371,7 +418,7 @@ export default function Reports() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Post Content</TableHead>
-                      <TableHead>Image</TableHead>
+                      <TableHead>Media</TableHead>
                       <TableHead>Reporter Details</TableHead>
                       <TableHead>Reason</TableHead>
                       <TableHead>Reported</TableHead>
@@ -380,7 +427,11 @@ export default function Reports() {
                   </TableHeader>
                   <TableBody>
                     {pendingReports.map((report) => (
-                      <TableRow key={report.id}>
+                      <TableRow
+                        key={report.id}
+                        className="cursor-pointer hover:bg-accent/50"
+                        onClick={() => openPostDetails(report)}
+                      >
                         <TableCell className="max-w-xs">
                           {report.post ? (
                             <div className="space-y-2">
@@ -408,13 +459,32 @@ export default function Reports() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => report.post?.image_url && window.open(report.post.image_url, '_blank')}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (report.post?.image_url) window.open(report.post.image_url, '_blank');
+                                }}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : report.post?.video_url ? (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center shrink-0">
+                                <Video className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (report.post?.video_url) window.open(report.post.video_url, '_blank');
+                                }}
                               >
                                 <ExternalLink className="h-3 w-3" />
                               </Button>
                             </div>
                           ) : (
-                            <span className="text-muted-foreground text-sm">No image</span>
+                            <span className="text-muted-foreground text-sm">No media</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -503,7 +573,11 @@ export default function Reports() {
               {/* Mobile Card View */}
               <div className="block md:hidden space-y-4">
                 {resolvedReports.slice(0, 5).map((report) => (
-                  <div key={report.id} className="border rounded-lg p-4 space-y-2">
+                  <div
+                    key={report.id}
+                    className="border rounded-lg p-4 space-y-2 cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => openPostDetails(report)}
+                  >
                     <div>
                       <span className="text-muted-foreground text-xs">Content:</span>
                       <p className="text-sm mt-1">
@@ -540,7 +614,11 @@ export default function Reports() {
                   </TableHeader>
                   <TableBody>
                     {resolvedReports.slice(0, 5).map((report) => (
-                      <TableRow key={report.id}>
+                      <TableRow
+                        key={report.id}
+                        className="cursor-pointer hover:bg-accent/50"
+                        onClick={() => openPostDetails(report)}
+                      >
                         <TableCell>
                           {report.post ? (
                             truncateText(report.post.content)
@@ -593,126 +671,218 @@ export default function Reports() {
 
       {/* Post Details Dialog */}
       <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
+        <DialogContent className="max-w-3xl lg:max-w-5xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Reported Post Details</DialogTitle>
+            <div className="flex items-center justify-between gap-3 pr-6">
+              <DialogTitle>Reported Post Details</DialogTitle>
+              {selectedPost && getStatusBadge(selectedPost.status)}
+            </div>
             <DialogDescription>
               Complete information about this reported post
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[70vh] pr-4">
-            {selectedPost?.post ? (
+          {selectedPost && (
+            <ScrollArea className="flex-1 min-h-0 pr-4" type="always">
               <div className="space-y-6">
-                {/* Post Image */}
-                {selectedPost.post.image_url && (
-                  <div className="rounded-lg overflow-hidden border">
-                    <img
-                      src={selectedPost.post.image_url}
-                      alt="Post content"
-                      className="w-full h-auto max-h-96 object-contain bg-muted"
-                    />
-                  </div>
-                )}
-
-                {/* Post Content */}
-                <div>
-                  <h3 className="font-semibold mb-2 flex items-center gap-2">
-                    <MessageCircle className="h-4 w-4" />
-                    Post Caption
-                  </h3>
-                  <p className="text-sm bg-muted p-4 rounded-lg whitespace-pre-wrap">
-                    {selectedPost.post.content}
-                  </p>
-                </div>
-
-                {/* Post Stats */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Heart className="h-4 w-4" />
-                      <span className="text-xs">Likes</span>
-                    </div>
-                    <p className="text-2xl font-bold">{selectedPost.post.likes_count}</p>
-                  </div>
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <MessageCircle className="h-4 w-4" />
-                      <span className="text-xs">Comments</span>
-                    </div>
-                    <p className="text-2xl font-bold">{selectedPost.post.comments_count}</p>
-                  </div>
-                </div>
-
-                {/* Report Information */}
-                <div className="border-t pt-4">
-                  <h3 className="font-semibold mb-3">Report Information</h3>
-                  <div className="space-y-3 text-sm">
-                    <div className="bg-muted p-3 rounded-lg">
-                      <span className="text-muted-foreground font-medium">Reporter Details:</span>
-                      {selectedPost.reporter ? (
-                        <div className="mt-2 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{selectedPost.reporter.name || "Unknown"}</span>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {/* Left column: post media + content */}
+                  <div className="space-y-4 min-w-0">
+                    {selectedPost.post ? (
+                      <>
+                        {/* Post Media */}
+                        {selectedPost.post.video_url ? (
+                          <div className="rounded-lg overflow-hidden border bg-black">
+                            <video
+                              src={selectedPost.post.video_url}
+                              controls
+                              className="w-full h-auto max-h-72"
+                            />
                           </div>
-                          {selectedPost.reporter.email && (
-                            <p className="text-xs text-muted-foreground">✉️ {selectedPost.reporter.email}</p>
-                          )}
-                          <p className="text-xs text-muted-foreground">📱 {selectedPost.reporter.phone_e164}</p>
-                          <p className="font-mono text-xs text-muted-foreground">ID: {selectedPost.reporter.id}</p>
+                        ) : selectedPost.post.image_url && (
+                          <div className="rounded-lg overflow-hidden border">
+                            <img
+                              src={selectedPost.post.image_url}
+                              alt="Post content"
+                              className="w-full h-auto max-h-72 object-contain bg-muted"
+                            />
+                          </div>
+                        )}
+
+                        {/* Post Content */}
+                        <div>
+                          <h3 className="font-semibold mb-2 flex items-center gap-2">
+                            <MessageCircle className="h-4 w-4" />
+                            Post Caption
+                          </h3>
+                          <p className="text-sm bg-muted p-4 rounded-lg whitespace-pre-wrap">
+                            {selectedPost.post.content}
+                          </p>
                         </div>
-                      ) : (
-                        <p className="font-mono text-xs mt-2">{selectedPost.reported_by}</p>
-                      )}
-                    </div>
+
+                        {/* Post Stats */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="border rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                              <Heart className="h-4 w-4" />
+                              <span className="text-xs">Likes</span>
+                            </div>
+                            <p className="text-2xl font-bold">{selectedPost.post.likes_count}</p>
+                          </div>
+                          <div className="border rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                              <MessageCircle className="h-4 w-4" />
+                              <span className="text-xs">Comments</span>
+                            </div>
+                            <p className="text-2xl font-bold">{selectedPost.post.comments_count}</p>
+                          </div>
+                        </div>
+
+                        {/* Post ID */}
+                        <p className="text-xs text-muted-foreground font-mono">Post ID: {selectedPost.post_id}</p>
+                      </>
+                    ) : (
+                      <div className="border rounded-lg p-4 text-center text-muted-foreground">
+                        <p className="text-sm">Post has been deleted</p>
+                        <p className="font-mono text-xs mt-2">Post ID: {selectedPost.post_id}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right column: author + report info */}
+                  <div className="space-y-4 min-w-0">
+                    {/* Post Author */}
+                    {selectedPost.post && (
+                      <div className="bg-muted p-3 rounded-lg text-sm">
+                        <span className="text-muted-foreground font-medium">Post Author:</span>
+                        {postAuthor ? (
+                          <div className="mt-2 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">{postAuthor.name || "Unknown"}</span>
+                            </div>
+                            {postAuthor.email && (
+                              <p className="text-xs text-muted-foreground">✉️ {postAuthor.email}</p>
+                            )}
+                            {postAuthor.phone_e164 && (
+                              <p className="text-xs text-muted-foreground">📱 {postAuthor.phone_e164}</p>
+                            )}
+                            <p className="font-mono text-xs text-muted-foreground">ID: {postAuthor.id}</p>
+                          </div>
+                        ) : (
+                          <p className="font-mono text-xs mt-2">{selectedPost.post.user_id}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Report Information */}
                     <div>
-                      <span className="text-muted-foreground">Reason:</span>
-                      <p className="mt-1">{selectedPost.reason || "No reason provided"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Reported on:</span>
-                      <p className="mt-1">{formatDate(selectedPost.created_at)}</p>
+                      <h3 className="font-semibold mb-3">Report Information</h3>
+                      <div className="space-y-3 text-sm">
+                        <div className="bg-muted p-3 rounded-lg">
+                          <span className="text-muted-foreground font-medium">Reporter Details:</span>
+                          {selectedPost.reporter ? (
+                            <div className="mt-2 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">{selectedPost.reporter.name || "Unknown"}</span>
+                              </div>
+                              {selectedPost.reporter.email && (
+                                <p className="text-xs text-muted-foreground">✉️ {selectedPost.reporter.email}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground">📱 {selectedPost.reporter.phone_e164}</p>
+                              <p className="font-mono text-xs text-muted-foreground">ID: {selectedPost.reporter.id}</p>
+                            </div>
+                          ) : (
+                            <p className="font-mono text-xs mt-2">{selectedPost.reported_by}</p>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-muted-foreground">Reason:</span>
+                            <p className="mt-1 capitalize">
+                              {selectedPost.reason ? selectedPost.reason.replace(/_/g, " ") : "No reason provided"}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Status:</span>
+                            <div className="mt-1">{getStatusBadge(selectedPost.status)}</div>
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Reported on:</span>
+                          <p className="mt-1">{formatDate(selectedPost.created_at)}</p>
+                        </div>
+                        <p className="font-mono text-xs text-muted-foreground">Report ID: {selectedPost.id}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Comments Section */}
-                <div className="border-t pt-4">
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <MessageCircle className="h-4 w-4" />
-                    Comments ({comments.length})
-                  </h3>
-                  {comments.length > 0 ? (
-                    <div className="space-y-3">
-                      {comments.map((comment) => (
-                        <div key={comment.id} className="bg-muted p-3 rounded-lg">
-                          <div className="flex items-center gap-2 mb-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium text-sm">
-                              {comment.users?.name || "Unknown User"}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDate(comment.created_at)}
-                            </span>
+                {selectedPost.post && (
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4" />
+                      Comments ({comments.length})
+                    </h3>
+                    {comments.length > 0 ? (
+                      <div className="space-y-3">
+                        {comments.map((comment) => (
+                          <div key={comment.id} className="bg-muted p-3 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium text-sm">
+                                {comment.users?.name || "Unknown User"}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(comment.created_at)}
+                              </span>
+                            </div>
+                            <p className="text-sm">{comment.content}</p>
                           </div>
-                          <p className="text-sm">{comment.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No comments on this post
-                    </p>
-                  )}
-                </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No comments on this post
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Post has been deleted</p>
-              </div>
-            )}
-          </ScrollArea>
+            </ScrollArea>
+          )}
+
+          {selectedPost?.status === "pending" && (
+            <div className="flex gap-2 pt-3 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  updateReportStatus(selectedPost.id, "dismissed");
+                  setDetailsDialogOpen(false);
+                }}
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Dismiss
+              </Button>
+              {selectedPost.post && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    setDetailsDialogOpen(false);
+                    openDeleteDialog(selectedPost.post_id, selectedPost.id);
+                  }}
+                >
+                  Delete Post
+                </Button>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

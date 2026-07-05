@@ -461,6 +461,7 @@ export type Database = {
           target_location: Json | null
           updated_at: string | null
           user_id: string | null
+          video_url: string | null
         }
         Insert: {
           category?: string | null
@@ -477,6 +478,7 @@ export type Database = {
           target_location?: Json | null
           updated_at?: string | null
           user_id?: string | null
+          video_url?: string | null
         }
         Update: {
           category?: string | null
@@ -493,6 +495,7 @@ export type Database = {
           target_location?: Json | null
           updated_at?: string | null
           user_id?: string | null
+          video_url?: string | null
         }
         Relationships: []
       }
