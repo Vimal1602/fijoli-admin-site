@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Eye, LifeBuoy } from "lucide-react";
+import { Eye, LifeBuoy, Lock, Unlock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -72,6 +72,10 @@ function statusLabel(status: string) {
     default:
       return status;
   }
+}
+
+function quickToggleTarget(status: SupportStatus): SupportStatus {
+  return status === "closed" ? "open" : "closed";
 }
 
 function statusBadgeVariant(status: SupportStatus): "default" | "secondary" | "outline" | "destructive" {
@@ -366,19 +370,36 @@ export default function Supports() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="default"
-                    className="w-full h-11 min-h-11 touch-target text-base sm:text-sm"
-                    onClick={() => {
-                      setSelected(ticket);
-                      setDetailsOpen(true);
-                    }}
-                  >
-                    <Eye className="h-4 w-4 mr-2 shrink-0" />
-                    View full ticket
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={ticket.status === "closed" ? "outline" : "secondary"}
+                      size="default"
+                      className="h-11 min-h-11 touch-target text-base sm:text-sm"
+                      disabled={updatingId === ticket.id}
+                      onClick={() => changeStatus(ticket.id, quickToggleTarget(ticket.status))}
+                    >
+                      {ticket.status === "closed" ? (
+                        <Unlock className="h-4 w-4 mr-2 shrink-0" />
+                      ) : (
+                        <Lock className="h-4 w-4 mr-2 shrink-0" />
+                      )}
+                      {ticket.status === "closed" ? "Reopen" : "Close"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="default"
+                      className="h-11 min-h-11 touch-target text-base sm:text-sm"
+                      onClick={() => {
+                        setSelected(ticket);
+                        setDetailsOpen(true);
+                      }}
+                    >
+                      <Eye className="h-4 w-4 mr-2 shrink-0" />
+                      View
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -400,7 +421,7 @@ export default function Supports() {
                   <TableHead className="min-w-[140px]">Status</TableHead>
                   <TableHead className="min-w-[130px]">Created</TableHead>
                   <TableHead className="min-w-[130px]">Updated</TableHead>
-                  <TableHead className="w-[100px]">Details</TableHead>
+                  <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -448,18 +469,36 @@ export default function Supports() {
                       {formatDate(ticket.updated_at)}
                     </TableCell>
                     <TableCell className="align-top">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="touch-target"
-                        onClick={() => {
-                          setSelected(ticket);
-                          setDetailsOpen(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="touch-target"
+                          title="View full ticket"
+                          onClick={() => {
+                            setSelected(ticket);
+                            setDetailsOpen(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="touch-target"
+                          disabled={updatingId === ticket.id}
+                          title={ticket.status === "closed" ? "Reopen ticket" : "Close ticket"}
+                          onClick={() => changeStatus(ticket.id, quickToggleTarget(ticket.status))}
+                        >
+                          {ticket.status === "closed" ? (
+                            <Unlock className="h-4 w-4" />
+                          ) : (
+                            <Lock className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -571,22 +610,38 @@ export default function Supports() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <p className="text-muted-foreground text-xs">Status</p>
-                  <Select
-                    value={selected.status}
-                    onValueChange={(v) => changeStatus(selected.id, v as SupportStatus)}
-                    disabled={updatingId === selected.id}
-                  >
-                    <SelectTrigger className="w-full h-11 min-h-11 touch-target text-base sm:h-10 sm:min-h-10 sm:text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="max-h-[min(50vh,320px)] w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)]">
-                      {SUPPORT_STATUSES.map((s) => (
-                        <SelectItem key={s} value={s} className="min-h-11 py-3 sm:min-h-10 sm:py-2">
-                          {statusLabel(s)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Select
+                      value={selected.status}
+                      onValueChange={(v) => changeStatus(selected.id, v as SupportStatus)}
+                      disabled={updatingId === selected.id}
+                    >
+                      <SelectTrigger className="w-full h-11 min-h-11 touch-target text-base sm:h-10 sm:min-h-10 sm:text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="max-h-[min(50vh,320px)] w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)]">
+                        {SUPPORT_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s} className="min-h-11 py-3 sm:min-h-10 sm:py-2">
+                            {statusLabel(s)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 min-h-11 touch-target text-base sm:h-10 sm:min-h-10 sm:text-sm shrink-0"
+                      disabled={updatingId === selected.id}
+                      onClick={() => changeStatus(selected.id, quickToggleTarget(selected.status))}
+                    >
+                      {selected.status === "closed" ? (
+                        <Unlock className="h-4 w-4 mr-2 shrink-0" />
+                      ) : (
+                        <Lock className="h-4 w-4 mr-2 shrink-0" />
+                      )}
+                      {selected.status === "closed" ? "Reopen" : "Close"}
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground sm:gap-2">
                   <div>
