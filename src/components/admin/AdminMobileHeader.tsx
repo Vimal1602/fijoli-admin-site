@@ -53,7 +53,7 @@ export function AdminMobileHeader() {
                         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                             <span className="text-primary-foreground font-bold text-sm">A</span>
                         </div>
-                        <h1 className="font-semibold text-foreground">Fijoli Admin</h1>
+                        <h1 className="font-semibold text-primary">Fijoli Admin</h1>
                     </div>
 
                     <button

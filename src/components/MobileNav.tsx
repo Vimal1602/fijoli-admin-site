@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, LayoutDashboard, FileImage, Users, AlertTriangle, LifeBuoy, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Menu, X, LayoutDashboard, FileImage, Users, AlertTriangle, LifeBuoy } from "lucide-react";
 
 const menuItems = [
     {
@@ -28,11 +27,6 @@ const menuItems = [
         title: "Support",
         url: "/admin/supports",
         icon: LifeBuoy,
-    },
-    {
-        title: "Reviews",
-        url: "/admin/reviews",
-        icon: Star,
     },
 ];
 
@@ -74,7 +68,7 @@ export function MobileNav() {
                 <div className="flex flex-col h-full">
                     {/* Header */}
                     <div className="p-6 border-b border-border">
-                        <h2 className="text-xl font-bold text-foreground">Navigation</h2>
+                        <h2 className="text-xl font-bold text-primary">Fijoli Admin</h2>
                     </div>
 
                     {/* Menu Items */}
@@ -95,7 +89,7 @@ export function MobileNav() {
                     {/* Footer */}
                     <div className="p-4 border-t border-border">
                         <p className="text-xs text-muted-foreground text-center">
-                            Fitness Social Admin
+                            fijoli.com
                         </p>
                     </div>
                 </div>

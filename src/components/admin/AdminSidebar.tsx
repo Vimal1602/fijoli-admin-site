@@ -6,7 +6,6 @@ import {
   Users,
   AlertTriangle,
   LifeBuoy,
-  Star,
 } from "lucide-react";
 import {
   Sidebar,
@@ -47,11 +46,6 @@ const menuItems = [
     url: "/admin/supports",
     icon: LifeBuoy,
   },
-  {
-    title: "Reviews",
-    url: "/admin/reviews",
-    icon: Star,
-  },
 ];
 
 export function AdminSidebar() {
@@ -81,12 +75,12 @@ export function AdminSidebar() {
       <div className="p-3 md:p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
-            <span className="text-primary-foreground font-bold text-sm">A</span>
+            <span className="text-primary-foreground font-bold text-sm">F</span>
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
-              <h2 className="font-semibold text-sidebar-foreground truncate">Fijoli Admin</h2>
-              <p className="text-xs text-sidebar-foreground/60 truncate">Fitness Social</p>
+              <h2 className="font-semibold text-primary truncate">Fijoli Admin</h2>
+              <p className="text-xs text-sidebar-foreground/60 truncate">fijoli.com</p>
             </div>
           )}
         </div>
