@@ -24,12 +24,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ReportedPost {
   id: string;
   post_id: string;
   reported_by: string;
   reason: string | null;
+  comment: string | null;
+  admin_comment: string | null;
+  admin_comment_at: string | null;
   status: "pending" | "resolved" | "dismissed";
   created_at: string;
   post: {
@@ -73,6 +77,8 @@ export default function Reports() {
   const [selectedPost, setSelectedPost] = useState<ReportedPost | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [postAuthor, setPostAuthor] = useState<PostAuthor | null>(null);
+  const [adminReplyDraft, setAdminReplyDraft] = useState("");
+  const [savingAdminReply, setSavingAdminReply] = useState(false);
 
   useEffect(() => {
     fetchReports();
@@ -88,6 +94,9 @@ export default function Reports() {
           post_id,
           reported_by,
           reason,
+          comment,
+          admin_comment,
+          admin_comment_at,
           status,
           created_at,
           posts:post_id (
@@ -194,8 +203,58 @@ export default function Reports() {
     }
   };
 
+  const saveAdminReply = async () => {
+    if (!selectedPost) return;
+    setSavingAdminReply(true);
+    try {
+      const trimmed = adminReplyDraft.trim();
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("post_reports")
+        .update({
+          admin_comment: trimmed || null,
+          admin_comment_at: trimmed ? now : null,
+        })
+        .eq("id", selectedPost.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Reply saved",
+        description: "The reporter will see this in the Fijoli app under Support → post reports.",
+      });
+
+      setSelectedPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              admin_comment: trimmed || null,
+              admin_comment_at: trimmed ? now : null,
+            }
+          : prev,
+      );
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === selectedPost.id
+            ? { ...r, admin_comment: trimmed || null, admin_comment_at: trimmed ? now : null }
+            : r,
+        ),
+      );
+    } catch (error) {
+      console.error("Error saving report admin reply:", error);
+      toast({
+        title: "Error",
+        description: "Could not save reply",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingAdminReply(false);
+    }
+  };
+
   const openPostDetails = async (report: ReportedPost) => {
     setSelectedPost(report);
+    setAdminReplyDraft(report.admin_comment || "");
     setDetailsDialogOpen(true);
     setPostAuthor(null);
 
@@ -813,8 +872,39 @@ export default function Reports() {
                           <span className="text-muted-foreground">Reported on:</span>
                           <p className="mt-1">{formatDate(selectedPost.created_at)}</p>
                         </div>
+                        {selectedPost.comment && (
+                          <div>
+                            <span className="text-muted-foreground">Reporter&apos;s message:</span>
+                            <p className="mt-1 text-sm whitespace-pre-wrap bg-background border rounded-md p-3">
+                              {selectedPost.comment}
+                            </p>
+                          </div>
+                        )}
                         <p className="font-mono text-xs text-muted-foreground">Report ID: {selectedPost.id}</p>
                       </div>
+                    </div>
+
+                    <div className="border rounded-lg p-4 space-y-3 bg-card">
+                      <h3 className="font-semibold text-sm">Reply to reporter (Fijoli app)</h3>
+                      <Textarea
+                        value={adminReplyDraft}
+                        onChange={(e) => setAdminReplyDraft(e.target.value)}
+                        rows={4}
+                        placeholder="Explain your decision or next steps…"
+                      />
+                      {selectedPost.admin_comment_at && (
+                        <p className="text-xs text-muted-foreground">
+                          Last sent: {formatDate(selectedPost.admin_comment_at)}
+                        </p>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={savingAdminReply}
+                        onClick={() => void saveAdminReply()}
+                      >
+                        {savingAdminReply ? "Saving…" : "Send reply to user"}
+                      </Button>
                     </div>
                   </div>
                 </div>

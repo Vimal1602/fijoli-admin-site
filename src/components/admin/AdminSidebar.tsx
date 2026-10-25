@@ -6,6 +6,7 @@ import {
   Users,
   AlertTriangle,
   LifeBuoy,
+  Star,
 } from "lucide-react";
 import {
   Sidebar,
@@ -45,6 +46,11 @@ const menuItems = [
     title: "Support",
     url: "/admin/supports",
     icon: LifeBuoy,
+  },
+  {
+    title: "Reviews",
+    url: "/admin/reviews",
+    icon: Star,
   },
 ];
 

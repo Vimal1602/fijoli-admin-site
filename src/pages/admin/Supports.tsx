@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 
 const SUPPORT_STATUSES = ["open", "in_progress", "resolved", "closed"] as const;
 type SupportStatus = (typeof SUPPORT_STATUSES)[number];
@@ -51,11 +52,13 @@ interface SupportTicket {
   status: SupportStatus;
   created_at: string;
   updated_at: string;
+  admin_comment: string | null;
+  admin_comment_at: string | null;
   user: SupportUser | null;
 }
 
 const SUPPORT_SELECT =
-  "id, user_id, number_details, issue_type, support_comment, status, created_at, updated_at, user:user_id ( id, name, email, phone_e164 )";
+  "id, user_id, number_details, issue_type, support_comment, status, admin_comment, admin_comment_at, created_at, updated_at, user:user_id ( id, name, email, phone_e164 )";
 
 const ticketsPerPage = 10;
 
@@ -109,6 +112,8 @@ export default function Supports() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selected, setSelected] = useState<SupportTicket | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [adminReplyDraft, setAdminReplyDraft] = useState("");
+  const [savingReply, setSavingReply] = useState(false);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -181,6 +186,52 @@ export default function Supports() {
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
   }, []);
+
+  useEffect(() => {
+    if (detailsOpen && selected) {
+      setAdminReplyDraft(selected.admin_comment || "");
+    }
+  }, [detailsOpen, selected?.id, selected?.admin_comment]);
+
+  const saveAdminReply = async () => {
+    if (!selected) return;
+    setSavingReply(true);
+    try {
+      const trimmed = adminReplyDraft.trim();
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("supports")
+        .update({
+          admin_comment: trimmed || null,
+          admin_comment_at: trimmed ? now : null,
+          updated_at: now,
+        })
+        .eq("id", selected.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Reply saved",
+        description: "The user will see this under Support in the Fijoli app.",
+      });
+
+      setSelected((prev) =>
+        prev && prev.id === selected.id
+          ? { ...prev, admin_comment: trimmed || null, admin_comment_at: trimmed ? now : null, updated_at: now }
+          : prev,
+      );
+      await fetchTickets({ silent: true });
+    } catch (error) {
+      console.error("Error saving admin reply:", error);
+      toast({
+        title: "Error",
+        description: "Could not save reply to user",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingReply(false);
+    }
+  };
 
   const changeStatus = async (ticketId: string, next: SupportStatus) => {
     setUpdatingId(ticketId);
@@ -607,6 +658,29 @@ export default function Supports() {
                 <div>
                   <p className="text-muted-foreground text-xs">Message</p>
                   <p className="whitespace-pre-wrap break-words bg-muted p-3 rounded-md">{selected.support_comment}</p>
+                </div>
+                <div className="space-y-2 border-t border-border pt-4">
+                  <p className="text-muted-foreground text-xs font-medium">Reply to user (shown in Fijoli app)</p>
+                  <Textarea
+                    value={adminReplyDraft}
+                    onChange={(e) => setAdminReplyDraft(e.target.value)}
+                    rows={4}
+                    placeholder="Write your response to the user…"
+                    className="resize-y min-h-[6rem]"
+                  />
+                  {selected.admin_comment_at && (
+                    <p className="text-xs text-muted-foreground">
+                      Last sent: {formatDate(selected.admin_comment_at)}
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    className="w-full sm:w-auto"
+                    disabled={savingReply}
+                    onClick={() => void saveAdminReply()}
+                  >
+                    {savingReply ? "Saving…" : "Send reply to user"}
+                  </Button>
                 </div>
                 <div className="flex flex-col gap-2">
                   <p className="text-muted-foreground text-xs">Status</p>
