@@ -14,13 +14,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { AdminDetailDialog } from "@/components/admin/AdminDetailDialog";
 import {
   Select,
   SelectContent,
@@ -28,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 
 const SUPPORT_STATUSES = ["open", "in_progress", "resolved", "closed"] as const;
@@ -271,6 +264,12 @@ export default function Supports() {
     setStatusFilter(next);
   };
 
+  const openTicket = (ticket: SupportTicket) => {
+    setSelected(ticket);
+    setAdminReplyDraft(ticket.admin_comment || "");
+    setDetailsOpen(true);
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -358,16 +357,29 @@ export default function Supports() {
             {tickets.map((ticket) => (
               <div
                 key={ticket.id}
-                className="rounded-xl border bg-card text-card-foreground shadow-sm p-4 space-y-3 active:bg-accent/20 transition-colors"
+                role="button"
+                tabIndex={0}
+                onClick={() => openTicket(ticket)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openTicket(ticket);
+                  }
+                }}
+                className="rounded-xl border bg-card text-card-foreground shadow-sm p-4 space-y-3 cursor-pointer hover:bg-accent/10 active:bg-accent/20 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] text-muted-foreground font-mono break-all leading-snug">
                       {ticket.id}
                     </p>
-                    <p className="text-sm font-medium mt-2 leading-snug line-clamp-6 break-words">
-                      {ticket.support_comment}
+                    <p className="text-sm font-medium mt-2 leading-snug line-clamp-4 break-words">
+                      {ticket.issue_type || "Support request"}
                     </p>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-3">{ticket.support_comment}</p>
+                    {ticket.admin_comment && (
+                      <p className="text-xs text-primary mt-2 line-clamp-2">Team reply sent — tap to view</p>
+                    )}
                   </div>
                   <Badge variant={statusBadgeVariant(ticket.status)} className="shrink-0 text-xs">
                     {statusLabel(ticket.status)}
@@ -404,7 +416,7 @@ export default function Supports() {
                     </div>
                   </div>
                 </dl>
-                <div className="flex flex-col gap-2 pt-1">
+                <div className="flex flex-col gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
                   <Select
                     value={ticket.status}
                     onValueChange={(v) => changeStatus(ticket.id, v as SupportStatus)}
@@ -442,13 +454,10 @@ export default function Supports() {
                       variant="secondary"
                       size="default"
                       className="h-11 min-h-11 touch-target text-base sm:text-sm"
-                      onClick={() => {
-                        setSelected(ticket);
-                        setDetailsOpen(true);
-                      }}
+                      onClick={() => openTicket(ticket)}
                     >
                       <Eye className="h-4 w-4 mr-2 shrink-0" />
-                      View
+                      Reply
                     </Button>
                   </div>
                 </div>
@@ -477,7 +486,11 @@ export default function Supports() {
               </TableHeader>
               <TableBody>
                 {tickets.map((ticket) => (
-                  <TableRow key={ticket.id}>
+                  <TableRow
+                    key={ticket.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openTicket(ticket)}
+                  >
                     <TableCell className="font-mono text-xs align-top">{ticket.id.substring(0, 8)}…</TableCell>
                     <TableCell className="align-top text-sm">
                       <div>{ticket.user?.name || "—"}</div>
@@ -495,7 +508,7 @@ export default function Supports() {
                     <TableCell className="align-top text-sm max-w-xs">
                       <span title={ticket.support_comment}>{truncateText(ticket.support_comment, 120)}</span>
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="align-top" onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={ticket.status}
                         onValueChange={(v) => changeStatus(ticket.id, v as SupportStatus)}
@@ -519,18 +532,15 @@ export default function Supports() {
                     <TableCell className="align-top text-sm text-muted-foreground whitespace-nowrap">
                       {formatDate(ticket.updated_at)}
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="align-top" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           className="touch-target"
-                          title="View full ticket"
-                          onClick={() => {
-                            setSelected(ticket);
-                            setDetailsOpen(true);
-                          }}
+                          title="Reply to user"
+                          onClick={() => openTicket(ticket)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -625,113 +635,103 @@ export default function Supports() {
         </CardContent>
       </Card>
 
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="w-[calc(100vw-1.25rem)] max-w-lg max-h-[min(90dvh,44rem)] gap-3 p-4 sm:p-6 sm:max-h-[90vh]">
-          <DialogHeader className="text-left space-y-1 pr-8">
-            <DialogTitle className="text-lg leading-snug">Ticket details</DialogTitle>
-            <DialogDescription className="text-sm">
-              Full fields for this support request.
-            </DialogDescription>
-          </DialogHeader>
-          {selected && (
-            <ScrollArea className="max-h-[min(65dvh,28rem)] sm:max-h-[70vh] pr-3 -mr-1">
-              <div className="space-y-4 text-sm pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-                <div>
-                  <p className="text-muted-foreground text-xs">Ticket ID</p>
-                  <p className="font-mono text-xs break-all">{selected.id}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">User</p>
-                  <p>{selected.user?.name || "—"}</p>
-                  <p className="font-mono text-xs text-muted-foreground break-all">{selected.user_id}</p>
-                  {selected.user?.email && <p className="text-xs">{selected.user.email}</p>}
-                  {selected.user?.phone_e164 && <p className="text-xs">{selected.user.phone_e164}</p>}
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Contact details (submitted)</p>
-                  <p className="whitespace-pre-wrap break-words">{selected.number_details}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Issue type</p>
-                  <p>{selected.issue_type || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Message</p>
-                  <p className="whitespace-pre-wrap break-words bg-muted p-3 rounded-md">{selected.support_comment}</p>
-                </div>
-                <div className="space-y-2 border-t border-border pt-4">
-                  <p className="text-muted-foreground text-xs font-medium">Reply to user (shown in Fijoli app)</p>
-                  <Textarea
-                    value={adminReplyDraft}
-                    onChange={(e) => setAdminReplyDraft(e.target.value)}
-                    rows={4}
-                    placeholder="Write your response to the user…"
-                    className="resize-y min-h-[6rem]"
-                  />
-                  {selected.admin_comment_at && (
-                    <p className="text-xs text-muted-foreground">
-                      Last sent: {formatDate(selected.admin_comment_at)}
-                    </p>
-                  )}
-                  <Button
-                    type="button"
-                    className="w-full sm:w-auto"
-                    disabled={savingReply}
-                    onClick={() => void saveAdminReply()}
-                  >
-                    {savingReply ? "Saving…" : "Send reply to user"}
-                  </Button>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <p className="text-muted-foreground text-xs">Status</p>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Select
-                      value={selected.status}
-                      onValueChange={(v) => changeStatus(selected.id, v as SupportStatus)}
-                      disabled={updatingId === selected.id}
-                    >
-                      <SelectTrigger className="w-full h-11 min-h-11 touch-target text-base sm:h-10 sm:min-h-10 sm:text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="max-h-[min(50vh,320px)] w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)]">
-                        {SUPPORT_STATUSES.map((s) => (
-                          <SelectItem key={s} value={s} className="min-h-11 py-3 sm:min-h-10 sm:py-2">
-                            {statusLabel(s)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11 min-h-11 touch-target text-base sm:h-10 sm:min-h-10 sm:text-sm shrink-0"
-                      disabled={updatingId === selected.id}
-                      onClick={() => changeStatus(selected.id, quickToggleTarget(selected.status))}
-                    >
-                      {selected.status === "closed" ? (
-                        <Unlock className="h-4 w-4 mr-2 shrink-0" />
-                      ) : (
-                        <Lock className="h-4 w-4 mr-2 shrink-0" />
-                      )}
-                      {selected.status === "closed" ? "Reopen" : "Close"}
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground sm:gap-2">
-                  <div>
-                    <p className="font-medium text-foreground">Created</p>
-                    <p className="mt-1 leading-snug">{formatDate(selected.created_at)}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Updated</p>
-                    <p className="mt-1 leading-snug">{formatDate(selected.updated_at)}</p>
-                  </div>
-                </div>
+      <AdminDetailDialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        title={selected?.issue_type || "Support ticket"}
+        description="Reply here — the user sees it under Support in the Fijoli app."
+        footer={
+          selected ? (
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              disabled={savingReply}
+              onClick={() => void saveAdminReply()}
+            >
+              {savingReply ? "Saving…" : "Save reply for user"}
+            </Button>
+          ) : undefined
+        }
+      >
+        {selected && (
+          <div className="space-y-4 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant={statusBadgeVariant(selected.status)}>{statusLabel(selected.status)}</Badge>
+              <span className="text-xs text-muted-foreground">{formatDate(selected.created_at)}</span>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs font-medium">User message</p>
+              <p className="whitespace-pre-wrap break-words bg-muted p-3 rounded-md mt-1">{selected.support_comment}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">User</p>
+                <p className="font-medium mt-1">{selected.user?.name || "—"}</p>
+                {selected.user?.email && <p className="text-xs break-all">{selected.user.email}</p>}
+                <p className="text-xs font-mono break-all text-muted-foreground mt-1">{selected.user_id}</p>
               </div>
-            </ScrollArea>
-          )}
-        </DialogContent>
-      </Dialog>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Contact (WhatsApp)</p>
+                <p className="mt-1 break-words">{selected.number_details}</p>
+              </div>
+            </div>
+            <div className="space-y-2 border-t pt-4">
+              <p className="font-medium text-sm">Your reply to the user</p>
+              <Textarea
+                value={adminReplyDraft}
+                onChange={(e) => setAdminReplyDraft(e.target.value)}
+                rows={5}
+                placeholder="Write your response…"
+                className="resize-y min-h-[7rem] text-base sm:text-sm"
+              />
+              {selected.admin_comment_at && (
+                <p className="text-xs text-muted-foreground">Last saved: {formatDate(selected.admin_comment_at)}</p>
+              )}
+            </div>
+            <div className="space-y-2 border-t pt-4">
+              <p className="text-xs text-muted-foreground font-medium">Ticket status</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Select
+                  value={selected.status}
+                  onValueChange={(v) => changeStatus(selected.id, v as SupportStatus)}
+                  disabled={updatingId === selected.id}
+                >
+                  <SelectTrigger className="w-full h-11 touch-target">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[min(50vh,320px)]">
+                    {SUPPORT_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s} className="min-h-11">
+                        {statusLabel(s)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 touch-target shrink-0"
+                  disabled={updatingId === selected.id}
+                  onClick={() => changeStatus(selected.id, quickToggleTarget(selected.status))}
+                >
+                  {selected.status === "closed" ? (
+                    <>
+                      <Unlock className="h-4 w-4 mr-2" />
+                      Reopen
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-4 w-4 mr-2" />
+                      Close
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+            <p className="font-mono text-[10px] text-muted-foreground break-all">ID: {selected.id}</p>
+          </div>
+        )}
+      </AdminDetailDialog>
     </div>
   );
 }
