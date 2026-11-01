@@ -1,29 +1,92 @@
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { FormEvent, useEffect, useState } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Shield } from "lucide-react";
-import { MobileNav } from "@/components/MobileNav";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ADMIN_PASSWORD,
+  ADMIN_USERNAME,
+  isAdminLoggedIn,
+  setAdminSession,
+  validateAdminLogin,
+} from "@/lib/adminAuth";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from || "/admin";
+
+  const [username, setUsername] = useState(ADMIN_USERNAME);
+  const [password, setPassword] = useState(ADMIN_PASSWORD);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (isAdminLoggedIn()) {
+      navigate(from, { replace: true });
+    }
+  }, [from, navigate]);
+
+  if (isAdminLoggedIn()) {
+    return <Navigate to={from} replace />;
+  }
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!validateAdminLogin(username, password)) {
+      setError("Use username Admin and password Admin@123 (not your Fijoli phone or member password).");
+      return;
+    }
+    setAdminSession();
+    navigate(from, { replace: true });
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <MobileNav />
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-red-50/90 to-white">
-        <div className="text-center space-y-6 md:space-y-8 max-w-4xl px-4 md:px-6">
-          <div className="space-y-3 md:space-y-4">
-            <p className="text-sm font-semibold uppercase tracking-widest text-primary">Fijoli</p>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-primary">Admin Dashboard</h1>
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-              Manage users, posts, reports, and support for the Fijoli community.
-            </p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-red-50/90 to-white p-4">
+      <Card className="w-full max-w-md shadow-lg border-red-100">
+        <CardHeader className="text-center space-y-2">
+          <div className="mx-auto w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
+            <Shield className="h-6 w-6 text-primary-foreground" />
           </div>
-          <Button asChild size="lg" className="text-base md:text-lg px-6 md:px-8 touch-target">
-            <Link to="/admin">
-              <Shield className="mr-2 h-5 w-5" />
-              Open Fijoli Admin
-            </Link>
-          </Button>
-        </div>
-      </div>
+          <CardTitle className="text-2xl text-primary">Fijoli Admin</CardTitle>
+          <CardDescription>Moderation panel — username Admin, not your mobile number.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={submit} className="space-y-4">
+            {error ? (
+              <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="admin-user">Username</Label>
+              <Input
+                id="admin-user"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                className="touch-target"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-pass">Password</Label>
+              <Input
+                id="admin-pass"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                className="touch-target"
+              />
+            </div>
+            <Button type="submit" className="w-full touch-target" size="lg">
+              Enter dashboard
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };

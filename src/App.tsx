@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { AdminLayout } from "./components/admin/AdminLayout";
+import { RequireAdmin } from "./components/admin/RequireAdmin";
 import Dashboard from "./pages/admin/Dashboard";
 import Posts from "./pages/admin/Posts";
 import Users from "./pages/admin/Users";
@@ -22,12 +23,15 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="posts" element={<Posts />} />
-            <Route path="users" element={<Users />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="supports" element={<Supports />} />
+          <Route path="/login" element={<Index />} />
+          <Route path="/admin" element={<RequireAdmin />}>
+            <Route element={<AdminLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="posts" element={<Posts />} />
+              <Route path="users" element={<Users />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="supports" element={<Supports />} />
+            </Route>
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
