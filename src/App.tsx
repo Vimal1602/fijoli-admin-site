@@ -12,6 +12,7 @@ import Posts from "./pages/admin/Posts";
 import Users from "./pages/admin/Users";
 import Reports from "./pages/admin/Reports";
 import Supports from "./pages/admin/Supports";
+import DeletedLogs from "./pages/admin/DeletedLogs";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
               <Route path="users" element={<Users />} />
               <Route path="reports" element={<Reports />} />
               <Route path="supports" element={<Supports />} />
+              <Route path="deleted-logs" element={<DeletedLogs />} />
             </Route>
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

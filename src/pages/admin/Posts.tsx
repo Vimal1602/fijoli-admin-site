@@ -50,10 +50,11 @@ export default function Posts() {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [postIdToDelete, setPostIdToDelete] = useState<string | null>(null);
+  const [hideDeactivatedAuthors, setHideDeactivatedAuthors] = useState(true);
 
   useEffect(() => {
     fetchPosts();
-  }, [currentPage]);
+  }, [currentPage, hideDeactivatedAuthors]);
 
   const fetchPosts = async () => {
     try {
@@ -61,11 +62,26 @@ export default function Posts() {
       const from = (currentPage - 1) * postsPerPage;
       const to = from + postsPerPage - 1;
 
-      const { data, error, count } = await supabase
+      let hiddenAuthorIds: string[] = [];
+      if (hideDeactivatedAuthors) {
+        const { data: hiddenUsers, error: hiddenError } = await supabase
+          .from("users")
+          .select("id")
+          .in("status", ["inactive", "suspended"]);
+        if (hiddenError) throw hiddenError;
+        hiddenAuthorIds = (hiddenUsers || []).map((u) => u.id);
+      }
+
+      let query = supabase
         .from("posts")
         .select("*", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .range(from, to);
+        .order("created_at", { ascending: false });
+
+      if (hiddenAuthorIds.length > 0) {
+        query = query.not("user_id", "in", `(${hiddenAuthorIds.join(",")})`);
+      }
+
+      const { data, error, count } = await query.range(from, to);
 
       if (error) throw error;
 
@@ -169,9 +185,37 @@ export default function Posts() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg md:text-xl">All Posts</CardTitle>
-          <CardDescription className="text-sm">View and manage posts from your users</CardDescription>
+        <CardHeader className="space-y-3">
+          <div>
+            <CardTitle className="text-lg md:text-xl">All Posts</CardTitle>
+            <CardDescription className="text-sm mt-1.5">View and manage posts from your users</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={hideDeactivatedAuthors ? "default" : "outline"}
+              className="touch-target h-10"
+              onClick={() => {
+                setCurrentPage(1);
+                setHideDeactivatedAuthors(true);
+              }}
+            >
+              Hide deactivated authors
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={!hideDeactivatedAuthors ? "default" : "outline"}
+              className="touch-target h-10"
+              onClick={() => {
+                setCurrentPage(1);
+                setHideDeactivatedAuthors(false);
+              }}
+            >
+              Show all posts
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="block md:hidden space-y-4">

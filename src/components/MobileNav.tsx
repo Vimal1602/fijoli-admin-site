@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, LayoutDashboard, FileImage, Users, AlertTriangle, LifeBuoy } from "lucide-react";
+import { Menu, X, LayoutDashboard, FileImage, Users, AlertTriangle, LifeBuoy, ScrollText } from "lucide-react";
 
 const menuItems = [
     {
@@ -27,6 +27,11 @@ const menuItems = [
         title: "Support",
         url: "/admin/supports",
         icon: LifeBuoy,
+    },
+    {
+        title: "Deleted logs",
+        url: "/admin/deleted-logs",
+        icon: ScrollText,
     },
 ];
 

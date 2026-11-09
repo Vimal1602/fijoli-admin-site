@@ -660,6 +660,36 @@ export type Database = {
           },
         ]
       }
+      user_deletion_logs: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          deleted_user_id: string
+          id: string
+          posts_deleted_count: number
+          reason: string | null
+          snapshot: Json
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          deleted_user_id: string
+          id?: string
+          posts_deleted_count?: number
+          reason?: string | null
+          snapshot: Json
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          deleted_user_id?: string
+          id?: string
+          posts_deleted_count?: number
+          reason?: string | null
+          snapshot?: Json
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           created_at: string | null
