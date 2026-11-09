@@ -125,12 +125,16 @@ export default function Users() {
     void fetchUsers();
   }, [fetchUsers]);
 
-  /** Same status as self-deactivate in the Fijoli app. */
+  /** Same status as self-deactivate in the Fijoli app (+ revoke live sessions). */
   const deactivateUser = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from("users")
-        .update({ status: "inactive", updated_at: new Date().toISOString() })
+        .update({
+          status: "inactive",
+          is_active: false,
+          updated_at: new Date().toISOString(),
+        } as Record<string, unknown>)
         .eq("id", userId)
         .select("id");
 
@@ -139,9 +143,24 @@ export default function Users() {
         throw new Error("No user was updated. Check UPDATE RLS on public.users.");
       }
 
+      // Kill existing app sessions so the phone must re-auth (and then get blocked).
+      const { error: sessionError } = await supabase
+        .from("auth_sessions")
+        .update({
+          revoked_at: new Date().toISOString(),
+          revoke_reason: "admin_deactivated",
+        } as Record<string, unknown>)
+        .eq("user_id", userId)
+        .is("revoked_at", null);
+
+      if (sessionError) {
+        console.warn("Could not revoke auth_sessions (RLS?):", sessionError);
+      }
+
       toast({
         title: "Account deactivated",
-        description: "Same as self-deactivate (status=inactive). Public search/feeds must hide inactive users.",
+        description:
+          "Profile set inactive (same as self-deactivate). Existing app sessions were revoked — reopen the app to be signed out.",
       });
       void fetchUsers();
     } catch (error) {
@@ -158,7 +177,11 @@ export default function Users() {
     try {
       const { data, error } = await supabase
         .from("users")
-        .update({ status: "active", updated_at: new Date().toISOString() })
+        .update({
+          status: "active",
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        } as Record<string, unknown>)
         .eq("id", userId)
         .select("id");
 
