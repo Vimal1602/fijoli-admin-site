@@ -38,7 +38,7 @@ interface SupportUser {
 
 interface SupportTicket {
   id: string;
-  user_id: string;
+  user_id: string | null;
   number_details: string;
   issue_type: string | null;
   support_comment: string;
@@ -54,6 +54,12 @@ const SUPPORT_SELECT =
   "id, user_id, number_details, issue_type, support_comment, status, admin_comment, admin_comment_at, created_at, updated_at, user:user_id ( id, name, email, phone_e164 )";
 
 const ticketsPerPage = 10;
+
+function ticketUserLabel(ticket: Pick<SupportTicket, "user" | "user_id">) {
+  if (ticket.user?.name) return ticket.user.name;
+  if (!ticket.user_id) return "Unauthenticated";
+  return "—";
+}
 
 function statusLabel(status: string) {
   switch (status) {
@@ -389,9 +395,9 @@ export default function Supports() {
                   <div>
                     <dt className="text-muted-foreground font-medium">User</dt>
                     <dd className="mt-0.5 break-words">
-                      {ticket.user?.name || "—"}
+                      {ticketUserLabel(ticket)}
                       <span className="block font-mono text-[11px] text-muted-foreground mt-0.5 break-all">
-                        {ticket.user_id}
+                        {ticket.user_id || "no linked account"}
                       </span>
                     </dd>
                   </div>
@@ -493,9 +499,9 @@ export default function Supports() {
                   >
                     <TableCell className="font-mono text-xs align-top">{ticket.id.substring(0, 8)}…</TableCell>
                     <TableCell className="align-top text-sm">
-                      <div>{ticket.user?.name || "—"}</div>
+                      <div>{ticketUserLabel(ticket)}</div>
                       <div className="text-xs text-muted-foreground font-mono truncate max-w-[160px]">
-                        {ticket.user_id}
+                        {ticket.user_id || "no linked account"}
                       </div>
                       {ticket.user?.email && (
                         <div className="text-xs text-muted-foreground truncate max-w-[160px]">{ticket.user.email}</div>
@@ -666,9 +672,11 @@ export default function Supports() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-muted-foreground">User</p>
-                <p className="font-medium mt-1">{selected.user?.name || "—"}</p>
+                <p className="font-medium mt-1">{ticketUserLabel(selected)}</p>
                 {selected.user?.email && <p className="text-xs break-all">{selected.user.email}</p>}
-                <p className="text-xs font-mono break-all text-muted-foreground mt-1">{selected.user_id}</p>
+                <p className="text-xs font-mono break-all text-muted-foreground mt-1">
+                  {selected.user_id || "no linked account"}
+                </p>
               </div>
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-muted-foreground">Contact (WhatsApp)</p>
